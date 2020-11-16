@@ -4,7 +4,7 @@
   register: pcs_out
   changed_when: pcs_out.rc == 0
   failed_when: >-
-    pcs_out.rc != 0 and \
+    pcs_out.rc != 0 and
     pcs_out.stderr.find('already exists') == -1 and
     pcs_out.stderr.find('is already a clone') == -1
   with_items:
