@@ -1,0 +1,22 @@
+- name: packages | add apt for 2ndQuadrant
+  apt_key:
+    url: https://apt.2ndquadrant.com/site/keys/9904CD4BD6BAF0C3.asc
+    state: present
+
+- name: packages | add 2ndQuadrant repo
+  apt_repository:
+    repo: "deb https://apt.2ndquadrant.com/ bionic-2ndquadrant main"
+    filename: 2ndquadrant
+    state: present
+    update_cache: true
+
+- name: packages | install repmgr packages
+  apt:
+    name:
+      - postgresql-{{ postgres_version }}-repmgr
+    state: present
+
+- name: packages | enable repmgrd
+  systemd:
+    name: repmgrd
+    enabled: true

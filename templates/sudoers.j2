@@ -1,0 +1,9 @@
+Defaults:postgres !requiretty
+Defaults  env_keep += "LOGFILE"
+
+postgres ALL = NOPASSWD: /usr/bin/pg_ctlcluster*, \
+  {{postgres_bin_directory}}/pg_ctl*, \
+  /usr/sbin/service repmgrd*, \
+  /usr/sbin/service postgresql*, \
+  /usr/local/bin/repmgr_handler*, \
+  /usr/local/bin/repmgr_pcs_role*

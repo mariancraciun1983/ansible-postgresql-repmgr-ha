@@ -1,0 +1,8 @@
+---
+- name: helpers-init | repmgr-handler leader
+  command: /usr/local/bin/repmgr-handler {{ inventory_hostname_short }} 1 primary_register 1
+  when: postgres_role == "master"
+
+- name: helpers-init | repmgr-handler observer
+  command: /usr/local/bin/repmgr-handler {{ inventory_hostname_short }} 1 standby_register 1
+  when: postgres_role == "slave"

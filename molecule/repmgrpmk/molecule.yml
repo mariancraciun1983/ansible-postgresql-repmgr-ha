@@ -1,0 +1,155 @@
+---
+scenario:
+  name: repmgrpmk
+  idempotent: false
+  test_sequence:
+    - lint
+    - destroy
+    - dependency
+    - syntax
+    - create
+    - prepare
+    - converge
+    # - idempotence
+    - verify
+    - destroy
+
+dependency:
+  name: galaxy
+
+driver:
+  name: docker
+
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+
+platforms:
+  - name: repmgrpmk1
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+    pre_build_image: true
+    docker_networks:
+      - name: molecule_repmgr_pcm
+        ipam_config:
+          - subnet: "10.30.53.0/24"
+    etc_hosts: >
+      {
+        "repmgrpmk1" : "10.30.53.11",
+        "repmgrpmk2" : "10.30.53.12",
+        "repmgrpmk3" : "10.30.53.13",
+      }
+    networks:
+      - name: molecule_repmgr_pcm
+        ipv4_address: "10.30.53.11"
+
+  - name: repmgrpmk2
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+    pre_build_image: true
+    docker_networks:
+      - name: molecule_repmgr_pcm
+        ipam_config:
+          - subnet: "10.30.53.0/24"
+    etc_hosts: >
+      {
+        "repmgrpmk1" : "10.30.53.11",
+        "repmgrpmk2" : "10.30.53.12",
+        "repmgrpmk3" : "10.30.53.13",
+      }
+    networks:
+      - name: molecule_repmgr_pcm
+        ipv4_address: "10.30.53.12"
+
+  - name: repmgrpmk3
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+    docker_networks:
+      - name: molecule_repmgr_pcm
+        ipam_config:
+          - subnet: "10.30.53.0/24"
+    etc_hosts: >
+      {
+        "repmgrpmk1" : "10.30.53.11",
+        "repmgrpmk2" : "10.30.53.12",
+        "repmgrpmk3" : "10.30.53.13",
+      }
+    networks:
+      - name: molecule_repmgr_pcm
+        ipv4_address: "10.30.53.13"
+
+provisioner:
+  name: ansible
+  playbooks:
+    create: create.yml
+    prepare: prepare.yml
+    converge: ../default/converge.yml
+  inventory:
+    group_vars:
+      all:
+        # requirements
+        install_python3: true
+
+        corosync_hacluster_password: 1q2w3e4r5t
+        corosync_cluster_settings:
+          - key: stonith-enabled
+            value: "false"
+          - key: no-quorum-policy
+            value: ignore
+          - key: start-failure-is-fatal
+            value: "false"
+          - key: symmetric-cluster
+            value: "false"
+
+
+        postgres_repmgr_pacemaker: true
+        postgres_repmgr_pacemaker_helpers_init: true
+
+        postgres_repmgr_enabled: true
+
+        _verify_postgres_repmgr_user:
+            name: repmgr
+            pass: repmgr1q2w3e
+            db: repmgr
+        _verify_master_ip: "10.30.53.11"
+        _verify_slave_ips:
+          - "10.30.53.12"
+          - "10.30.53.13"
+    host_vars:
+      repmgrpmk1:
+        postgres_role: master
+        postgres_repmgr_node_id: 1
+      repmgrpmk2:
+        postgres_role: slave
+        postgres_repmgr_node_id: 2
+      repmgrpmk3:
+        postgres_role: slave
+        postgres_repmgr_node_id: 3
+
+verifier:
+  name: ansible

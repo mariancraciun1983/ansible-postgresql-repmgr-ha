@@ -1,0 +1,17 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: health | check if all slaves are connected to the master
+      command: psql -Aqtc "SELECT count(*) FROM pg_stat_replication"
+      become: true
+      become_user: postgres
+      register: slavecount
+      vars:
+        ansible_ssh_pipelining: no
+      until: (slavecount.stdout|string) == ((play_hosts|length - 1)|string)
+      retries: 10
+      delay: 1
+      changed_when: no
+      when: postgres_role == 'master'

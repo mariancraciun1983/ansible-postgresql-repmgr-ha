@@ -1,0 +1,5 @@
+<node id="2" uname="node2">
+  <instance_attributes id="nodes-2">
+    <nvpair id="nodes-2-repmgr_role" name="repmgr_role" value="primary"/>
+  </instance_attributes>
+</node>

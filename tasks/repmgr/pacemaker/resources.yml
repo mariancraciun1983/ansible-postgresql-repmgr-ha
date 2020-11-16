@@ -1,0 +1,31 @@
+---
+- name: resources | create pcs resources
+  command: "{{ item }}"
+  register: pcs_out
+  changed_when: pcs_out.rc == 0
+  failed_when: >-
+    pcs_out.rc != 0 and \
+    pcs_out.stderr.find('already exists') == -1 and
+    pcs_out.stderr.find('is already a clone') == -1
+  with_items:
+    - pcs cluster cib postgresql-ha
+    - >-
+      pcs -f postgresql-ha resource create PostgresqlLBReadBlock ocf:heartbeat:command_raw
+      start_cmd="/usr/sbin/iptables -w --wait-interval 10 -A INPUT -m mark --mark 5434 -j REJECT"
+      stop_cmd="/usr/sbin/iptables -w --wait-interval 10 -D INPUT -m mark --mark 5434 -j REJECT"
+      monitor_cmd="/usr/sbin/iptables -w --wait-interval 10 -C INPUT -m mark --mark 5434 -j REJECT"
+    - >-
+      pcs -f postgresql-ha resource create PostgresqlLBWriteBlock ocf:heartbeat:command_raw
+      start_cmd="/usr/sbin/iptables -w --wait-interval 10 -A INPUT -m mark --mark 5435 -j REJECT"
+      stop_cmd="/usr/sbin/iptables -w --wait-interval 10 -D INPUT -m mark --mark 5435 -j REJECT"
+      monitor_cmd="/usr/sbin/iptables -w --wait-interval 10 -C INPUT -m mark --mark 5435 -j REJECT"
+    - pcs -f postgresql-ha resource clone PostgresqlLBReadBlock clone-node-max=1 clone-min=1
+    - pcs -f postgresql-ha resource clone PostgresqlLBWriteBlock clone-node-max=1 clone-min=1
+    # failed roles get blocked on both reads and writes
+    - pcs -f postgresql-ha constraint location PostgresqlLBReadBlock-clone rule score=INFINITY postgresql_role eq fail
+    - pcs -f postgresql-ha constraint location PostgresqlLBWriteBlock-clone rule score=INFINITY postgresql_role eq fail
+    # replica gets blocked on writes
+    - pcs -f postgresql-ha constraint location PostgresqlLBWriteBlock-clone rule score=INFINITY postgresql_role eq replica
+    - pcs cluster cib-push --wait 60 postgresql-ha
+  args:
+    chdir: /var/lib/postgresql

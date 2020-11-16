@@ -1,0 +1,52 @@
+---
+- name: rempgr | exchange hostsnames in hosts file
+  blockinfile:
+    path: "{{ postgres_config_directory }}/conf.d/03-other.conf"
+    block: shared_preload_libraries = 'repmgr'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK repmgr"
+
+- name: rempgr | create remgr user
+  block:
+  - name: rempgr | create remgr user
+    postgresql_user:
+      name: "{{ postgres_repmgr_user.name }}"
+      password: "{{ postgres_repmgr_user.pass }}"
+      role_attr_flags: SUPERUSER
+      encrypted: true
+  - name: user | ensure remgr db
+    postgresql_db:
+      name: "{{ postgres_repmgr_user.db }}"
+
+  become_user: postgres
+  become: true
+  when: postgres_role == 'master'
+
+- name: rempgr | add postgres to sudoers
+  template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/postgres
+    mode: 0400
+
+- name: rempgr | deploy repmgr.conf
+  template:
+    src: "repmgr.conf.j2"
+    dest: "/etc/repmgr.conf"
+    owner: postgres
+    group: postgres
+    mode: 0640
+  notify: restart repmgrd
+
+- name: rempgr | deploy repmgrd
+  template:
+    src: repmgrd.j2
+    dest: /etc/default/repmgrd
+    mode: 0640
+  notify: restart repmgrd
+
+- name: rempgr | ensure rempgr is started
+  systemd:
+    name: repmgrd
+    state: started
+
+- name: rempgr | flush handlers
+  meta: flush_handlers

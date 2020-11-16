@@ -1,0 +1,26 @@
+# hostname:port:database:username:password
+
+{% for host in groups.all %}
+
+
+{% if postgres_repmgr_enabled|bool %}
+{{ hostvars[host]['inventory_hostname_short'] + ':*:' + postgres_repmgr_user.db + ':' + postgres_repmgr_user.name + ':' + postgres_repmgr_user.pass}}
+
+{% if postgres_use_internal_ip|bool %}
+{{ internal_ip + ':*:' + postgres_repmgr_user.db + ':' + postgres_repmgr_user.name + ':' + postgres_repmgr_user.pass}}
+{% else %}
+{{ hostvars[host]['ansible_default_ipv4']['address'] + ':*:' + postgres_repmgr_user.db + ':' + postgres_repmgr_user.name + ':' + postgres_repmgr_user.pass}}
+{% endif %}
+
+{% endif %}
+
+{{ hostvars[host]['inventory_hostname_short'] + ':*:replication:' + postgres_repl_user.name + ':' + postgres_repl_user.pass}}
+
+{% if postgres_use_internal_ip|bool %}
+{{ internal_ip + ':*:replication:' + postgres_repl_user.name + ':' + postgres_repl_user.pass }}
+{% else %}
+{{ hostvars[host]['ansible_default_ipv4']['address'] + ':*:replication:' + postgres_repl_user.name + ':' + postgres_repl_user.pass }}
+{% endif %}
+
+{% endfor %}
+

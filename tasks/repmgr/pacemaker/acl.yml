@@ -1,0 +1,20 @@
+- name: pcs | add postgres user to haclient group
+  user:
+    name: postgres
+    group: postgres
+    groups:
+      - postgres
+      - haclient
+      - ssl-cert
+    append: false
+
+- name: pcs | pacemaker postgres acls
+  command: "{{ item }}"
+  register: pcs_out
+  changed_when: pcs_out.rc == 0
+  failed_when: "pcs_out.rc != 0 and pcs_out.stderr.find('already exists') == -1"
+  with_items:
+    - pcs acl enable
+    - pcs acl role create PostgresRole description="Full access to cluster" write xpath /cib
+    - pcs acl user create postgres PostgresRole
+  when: inventory_hostname == play_hosts[0]

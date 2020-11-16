@@ -1,0 +1,33 @@
+- name: network | postgresql iptables multiport - mangle MARK
+  iptables_raw:
+    name: postgresql_multiport_mangle
+    table: mangle
+    rules: |
+      -A OUTPUT -p tcp -m tcp -o lo --dport 5434 -j MARK --set-mark 5434
+      -A OUTPUT -p tcp -m tcp -o lo --dport 5435 -j MARK --set-mark 5435
+      -A PREROUTING -p tcp -m tcp --dport 5434 -j MARK --set-mark 5434
+      -A PREROUTING -p tcp -m tcp --dport 5435 -j MARK --set-mark 5435
+
+- name: network |  postgresql iptables multiport - nat REDIRECT
+  iptables_raw:
+    name: postgresql_multiport_nat
+    table: nat
+    rules: |
+      -A OUTPUT -p tcp -m tcp -o lo --dport 5434 -j REDIRECT --to-ports 5432
+      -A OUTPUT -p tcp -m tcp -o lo --dport 5435 -j REDIRECT --to-ports 5432
+      -A PREROUTING -p tcp --dport 5434 -j REDIRECT --to-ports 5432
+      -A PREROUTING -p tcp --dport 5435 -j REDIRECT --to-ports 5432
+
+- name: network | allow ip forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+
+- name: verify | RO/6380 Allowed | cross-check - debug
+  debug:
+    msg: >-
+      Connecting from {{ ansible_hostname }}
+      to {{ hostvars[item]['ansible_default_ipv4']['address'] }}
+      port 6380 (RO)
+  with_items: "{{ play_hosts }}"

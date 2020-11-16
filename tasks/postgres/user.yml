@@ -1,0 +1,12 @@
+---
+- name: user | create superuser
+  postgresql_user:
+    name: "{{ postgres_admin_user.name }}"
+    password: "{{ postgres_admin_user.pass }}"
+    role_attr_flags: SUPERUSER
+    encrypted: true
+
+- name: user | create superuser db
+  postgresql_db:
+    name: "{{ postgres_admin_user.db }}"
+  when: "'db' in postgres_admin_user"

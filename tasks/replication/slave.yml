@@ -1,0 +1,44 @@
+- name: slave | check standby status
+  stat:
+    path: '{{ postgres_data_directory }}/standby.signal'
+  register: standby_status
+
+- name: slave | init
+  block:
+    - name: slave | init | stop postgresql
+      systemd:
+        name: postgresql
+        state: stopped
+    - name: slave | init | remove data
+      file:
+        state: absent
+        path: "{{ postgres_data_directory }}"
+    - name: slave | init | initialize the slave database
+      command: >-
+        {{ postgres_bin_directory }}/pg_basebackup
+        -D {{ postgres_data_directory }}
+        -h {{ postgres_master_ip }}
+        -X stream
+        -c fast
+        -U {{ postgres_repl_user.name }} -w -R
+      register: pg_basebackup_out
+      until: pg_basebackup_out.rc == 0 or pg_basebackup_out.stderr.find("is not empty") != -1
+      retries: 3
+      delay: 10
+      become_user: postgres
+      become: true
+  when: not standby_status.stat.exists or postgres_slave_cleanup|bool
+
+- name: slave | ensure postgresql is started
+  systemd:
+    name: postgresql
+    state: started
+
+- name: rempgr | flush handlers
+  meta: flush_handlers
+
+- name: slave | wait for postgres to listen on port 5432
+  wait_for:
+    port: 5432
+    delay: 5
+    timeout: 120

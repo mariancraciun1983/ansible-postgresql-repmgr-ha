@@ -1,0 +1,44 @@
+---
+- name: packages | add dependencies
+  apt:
+    name:
+      - gnupg2
+      - apt-transport-https
+      - ca-certificates
+      - software-properties-common
+    update_cache: true
+    state: present
+
+
+- name: packages | add apt repo key for postgresql
+  apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    state: present
+
+- name: packages | add postgresql repo
+  apt_repository:
+    repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_distribution_release }}-pgdg main"
+    filename: postgresql
+    state: present
+
+- name: packages | install packages
+  apt:
+    update_cache: true
+    name:
+      - postgresql-{{ postgres_version }}
+      - postgresql-client-{{ postgres_version }}
+      - postgresql-contrib-{{ postgres_version }}
+      - iptables
+      - iptables-persistent
+    state: present
+
+- name: packages | pip dependencies
+  pip:
+    executable: pip3
+    name:
+      - psycopg2-binary==2.8.6
+
+- name: packages | enable postgresql
+  systemd:
+    name: postgresql
+    enabled: true

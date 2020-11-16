@@ -1,0 +1,73 @@
+---
+- name: master | init
+  block:
+    - name: master | init | stop postgresql
+      systemd:
+        name: postgresql
+        state: stopped
+    - name: master | init | remove data
+      file:
+        state: absent
+        path: "{{ postgres_data_directory }}"
+  when: postgres_master_cleanup|bool
+
+- name: master | check init status
+  stat:
+    path: '{{ postgres_data_directory }}/PG_VERSION'
+  register: init_status
+
+- name: master | check standby status
+  stat:
+    path: '{{ postgres_data_directory }}/standby.signal'
+  register: standby_status
+
+- name: master | promote
+  block:
+    - name: master | promote | stop postgresql
+      systemd:
+        name: postgresql
+        state: stopped
+    - name: master | promote | promote slave database to master
+      command: "{{ postgres_bin_directory }}/pg_ctl promote -D {{ postgres_data_directory }}"
+      become_user: postgres
+      become: true
+  when: init_status.stat.exists and standby_status.stat.exists
+
+- name: master | init
+  block:
+    - name: master | init | stop postgresql
+      systemd:
+        name: postgresql
+        state: stopped
+    - name: master | init | initialize the master database
+      command: "{{ postgres_bin_directory }}/initdb -D {{ postgres_data_directory }}"
+      when: not init_status.stat.exists
+      become_user: postgres
+      become: true
+  when: not init_status.stat.exists
+
+- name: master | ensure postgresql is started
+  systemd:
+    name: postgresql
+    state: started
+
+- name: rempgr | flush handlers
+  meta: flush_handlers
+
+- name: master | wait for postgres to listen on port 5432
+  wait_for:
+    port: 5432
+    delay: 5
+    timeout: 120
+
+- name: master | create replication user
+  postgresql_user:
+    name: "{{ postgres_repl_user.name }}"
+    password: "{{ postgres_repl_user.pass }}"
+    role_attr_flags: REPLICATION
+    encrypted: true
+    priv: ALL
+    db: postgres
+  become_user: postgres
+  become: true
+  no_log: true

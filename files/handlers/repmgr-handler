@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# usage: LOGFILE=repmgr_handler.log repmgr_handler node3 1 standby_promote 1
+
+if [[ -z "${LOGFILE}" ]]; then
+  LOGFILE=/dev/null
+fi
+
+echo "Set logfile to $LOGFILE"
+
+NODE_NAME="$1"
+NODE_ID="$2"
+EVENT="$3"
+SUCCESS="$4"
+
+date 2>&1 | tee -a $LOGFILE
+echo "Called with args $@" 2>&1 | tee -a $LOGFILE
+
+if [[ "$EVENT" =~ ^(primary_register|standby_promote|repmgrd_failover_promote)$ ]]; then
+  echo "This server is now a primary" 2>&1 | tee -a $LOGFILE
+fi
+
+if [[ "$EVENT" =~ ^(standby_register|standby_follow|repmgrd_failover_follow|repmgrd_standby_reconnect)$ ]]; then
+  echo "This server is now a replica" 2>&1 | tee -a $LOGFILE
+fi
+
+echo "Calling repmgr_pcs_role" 2>&1 | tee -a $LOGFILE
+repmgr-handler-pcs "$NODE_NAME" "$EVENT" 2>&1 | tee -a $LOGFILE

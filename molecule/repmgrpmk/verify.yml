@@ -1,0 +1,93 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  vars:
+    postgres_repmgr_user: "{{ _verify_postgres_repmgr_user }}"
+    postgres_master_ip: "{{ _verify_master_ip }}"
+    postgres_slave_ips: "{{ _verify_slave_ips }}"
+  tasks:
+    - name: health | check if all slaves are connected to the master
+      command: psql -Aqtc "SELECT count(*) FROM pg_stat_replication"
+      become: true
+      become_user: postgres
+      register: slavecount
+      vars:
+        ansible_ssh_pipelining: no
+      until: (slavecount.stdout|string) == ((play_hosts|length - 1)|string)
+      retries: 10
+      delay: 1
+      changed_when: no
+      when: postgres_role == 'master'
+
+    - name: health | cross cluster check
+      command: repmgr -f /etc/repmgr.conf cluster crosscheck
+      become: true
+      become_user: postgres
+      changed_when: no
+
+    - name: verify | RO/5434 Allowed | cross-check - debug
+      debug:
+        msg: >-
+          Connecting from {{ ansible_hostname }}
+          to {{ hostvars[item]['ansible_default_ipv4']['address'] }}
+          port 5434 (RO)
+      with_items: "{{ play_hosts }}"
+
+    - name: verify | RO/5434 Allowed | cross-check
+      command: >-
+        psql
+        -h {{ hostvars[item]['ansible_default_ipv4']['address'] }}
+        -U {{ postgres_repmgr_user.name }}
+        -d {{ postgres_repmgr_user.db }}
+        -p 5434
+        -w
+        -Aqtc "SELECT 1"
+      become: true
+      become_user: postgres
+      with_items: "{{ play_hosts }}"
+      changed_when: false
+
+    - name: verify | RW/5435 Allowed on master
+      debug:
+        msg: >-
+          Connecting from {{ ansible_hostname }}
+          to {{ postgres_master_ip }}
+          port 5435 (RW)
+
+    - name: verify | RW/5435 Allowed on master
+      command: >-
+        psql
+        -h {{ postgres_master_ip }}
+        -U {{ postgres_repmgr_user.name }}
+        -d {{ postgres_repmgr_user.db }}
+        -p 5435
+        -w
+        -Aqtc "SELECT 1"
+      become: true
+      become_user: postgres
+      changed_when: false
+
+    - name: verify | RO/5435 blocked on slaves
+      debug:
+        msg: >-
+          Connecting from {{ ansible_hostname }}
+          to {{ hostvars[item]['ansible_default_ipv4']['address'] }}
+          port 5435 (RW)
+      with_items: "{{ play_hosts }}"
+
+    - name: verify | RW/5435 blocked on slaves
+      command: >-
+        psql
+        -h {{ item }}
+        -U {{ postgres_repmgr_user.name }}
+        -d {{ postgres_repmgr_user.db }}
+        -p 5435
+        -w
+        -Aqtc "SELECT 1"
+      become: true
+      become_user: postgres
+      with_items: "{{ postgres_slave_ips }}"
+      register: rout
+      failed_when: rout.rc == 0
+      changed_when: false

@@ -1,0 +1,17 @@
+- name: reload postgresql
+  systemd: name=postgresql state=reloaded
+
+- name: reload repmgrd
+  systemd: name=repmgrd state=reloaded
+
+- name: restart postgresql
+  systemd: name=postgresql state=restarted
+
+- name: restart repmgrd
+  systemd: name=repmgrd state=restarted
+
+- name: start postgresql
+  systemd: name=postgresql state=started
+
+- name: stop postgresql
+  systemd: name=postgresql state=stopped

@@ -1,0 +1,9 @@
+---
+- name: Prepare
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: install_python
+      include_role:
+        name: mariancraciun1983.install_python
+      when: install_python3|bool

@@ -1,0 +1,24 @@
+---
+- name: resources reset | pcs cleanup
+  command: "{{ item }}"
+  register: pcs_out
+  changed_when: pcs_out.rc == 0
+  failed_when: >-
+    pcs_out.rc != 0 and
+    pcs_out.stderr.find('could not find') == -1 and
+    pcs_out.stderr.find('does not exist') == -1
+  with_items:
+    - pcs cluster cib postgres-ha
+    - pcs -f postgres-ha resource unclone PostgresqlLBReadBlock-clone
+    - pcs -f postgres-ha resource unclone PostgresqlLBWriteBlock-clone
+    - pcs -f postgres-ha resource delete PostgresqlLBReadBlock
+    - pcs -f postgres-ha resource delete PostgresqlLBWriteBlock
+    - pcs cluster cib-push --wait 60 postgres-ha
+  args:
+    chdir: /var/lib/postgresql
+- name: pcs | pcs remove postgresql_role attribute from nodes
+  command: "pcs node attribute {{ hostvars[item]['ansible_hostname'] }} postgresql_role="
+  register: pcs_out
+  changed_when: pcs_out.rc == 0
+  failed_when: "pcs_out.rc != 0 and pcs_out.stderr.find('t exist for node') == -1"
+  with_items: "{{ play_hosts }}"

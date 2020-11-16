@@ -1,0 +1,12 @@
+- name: repmgr | ensure primary postgresql is started
+  systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: repmgr | register primary
+  command: repmgr primary register -F
+  changed_when: false
+  register: repmgr_out
+  become_user: postgres
+  become: true

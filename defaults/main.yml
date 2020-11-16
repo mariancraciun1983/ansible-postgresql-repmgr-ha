@@ -1,0 +1,53 @@
+postgres_role:
+postgres_repmgr_node_id:
+
+_postgres_master_envvars: "{{ hostvars | filter_first_hostvars('postgres_role','master') }}"
+
+postgres_use_internal_ip: false
+
+postgres_master_ip: "{% if postgres_use_internal_ip|bool %}{{ _postgres_master_envvars['internal_ip'] }}{% else %}{{ _postgres_master_envvars['ansible_default_ipv4']['address'] }}{% endif %}"
+postgres_master_name: "{{ _postgres_master_envvars['ansible_hostname'] }}"
+postgres_master_node_id: "{{ _postgres_master_envvars['postgres_repmgr_node_id'] }}"
+
+postgres_listen_ip: "{% if postgres_use_internal_ip|bool %}{{ internal_ip }}{% else %}{{ ansible_default_ipv4.address }}{% endif %}"
+
+postgres_version: 13
+
+postgres_config_directory: "/etc/postgresql/{{ postgres_version }}/main"
+postgres_data_directory: "/var/lib/postgresql/{{ postgres_version }}/main"
+postgres_bin_directory: "/usr/lib/postgresql/{{ postgres_version }}/bin"
+
+# do we want to cleanup the master data?
+postgres_master_cleanup: false
+postgres_slave_cleanup: false
+postgres_check_replication: false
+
+postgres_admin_user:
+  db: admin
+  name: admin
+  pass: admin1q2w3e
+
+postgres_repl_user:
+  name: repl
+  pass: repl1q2w3e
+
+## Repmg
+
+postgres_repmgr_enabled: false
+postgres_repmgr_user:
+  name: repmgr
+  pass: repmgr1q2w3e
+  db: repmgr
+
+postgres_repmgr_pacemaker: false
+postgres_repmgr_pacemaker_reset: false
+postgres_repmgr_pacemaker_helpers_init: false
+
+
+postgres_repmgr_pcs: false
+postgres_repmgr_pcs_cleanup: false
+
+# postgres_ha_ip_internal:
+
+# used to automatically rejoin one of the failed masters
+postgres_repmgr_failover_host:

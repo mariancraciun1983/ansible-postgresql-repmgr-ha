@@ -1,0 +1,13 @@
+---
+- name: helpers | deploy repmgr handlers
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: 0755
+  loop:
+    - src: files/handlers/repmgr-handler
+      dest: /usr/local/bin/repmgr-handler
+    - src: files/handlers/repmgr-handler-pcs
+      dest: /usr/local/bin/repmgr-handler-pcs

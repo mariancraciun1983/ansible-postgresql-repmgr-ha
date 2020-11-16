@@ -1,0 +1,92 @@
+---
+scenario:
+  name: repmgr
+  idempotent: false
+  test_sequence:
+    - lint
+    - destroy
+    - dependency
+    - syntax
+    - create
+    - prepare
+    - converge
+    # - idempotence
+    - verify
+    - destroy
+
+dependency:
+  name: galaxy
+
+driver:
+  name: docker
+
+lint: |
+  set -e
+  yamllint .
+  ansible-lint
+
+platforms:
+  - name: nodegrpmgr1
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+    pre_build_image: true
+
+  - name: nodegrpmgr2
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+    pre_build_image: true
+
+  - name: nodegrpmgr3
+    image: geerlingguy/docker-ubuntu2004-ansible:latest
+    tmpfs:
+      - /run
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    capabilities:
+      - SYS_ADMIN
+    command: "/lib/systemd/systemd"
+    privileged: true
+
+provisioner:
+  name: ansible
+  playbooks:
+    create: create.yml
+    prepare: prepare.yml
+    converge: ../default/converge.yml
+  inventory:
+    group_vars:
+      all:
+        # requirements
+        install_python3: true
+
+        postgres_repmgr_enabled: true
+    host_vars:
+      nodegrpmgr1:
+        postgres_role: master
+        postgres_repmgr_node_id: 1
+      nodegrpmgr2:
+        postgres_role: slave
+        postgres_repmgr_node_id: 2
+      nodegrpmgr3:
+        postgres_role: slave
+        postgres_repmgr_node_id: 3
+
+verifier:
+  name: ansible

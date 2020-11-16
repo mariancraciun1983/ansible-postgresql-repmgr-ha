@@ -1,0 +1,39 @@
+---
+- name: pacemaker | network
+  import_tasks: network.yml
+  tags:
+    - pacemaker-network
+
+- name: pacemaker | acl
+  import_tasks: acl.yml
+  tags:
+    - pacemaker-acl
+
+- name: pacemaker | helpers
+  import_tasks: helpers.yml
+  tags:
+    - pacemaker-helpers
+
+- name: pacemaker | resources reset
+  import_tasks: resources-reset.yml
+  become_user: postgres
+  become: true
+  tags:
+    - pacemaker-resources-reset
+  when: inventory_hostname == play_hosts[0] and postgres_repmgr_pacemaker_reset|bool
+
+- name: pacemaker | resources
+  import_tasks: resources.yml
+  become_user: postgres
+  become: true
+  tags:
+    - pacemaker-resources
+  when: inventory_hostname == play_hosts[0]
+
+- name: pacemaker | resources reset
+  import_tasks: helpers-init.yml
+  become_user: postgres
+  become: true
+  tags:
+    - pacemaker-helpers-init
+  when: postgres_repmgr_pacemaker_helpers_init|bool

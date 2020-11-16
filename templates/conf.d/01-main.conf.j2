@@ -1,0 +1,10 @@
+listen_addresses = '{{ postgres_listen_ip }},localhost'
+
+
+max_wal_senders = 15
+max_replication_slots = 15
+wal_level = 'replica'
+hot_standby = on
+archive_mode = on
+archive_command = '/bin/true'
+

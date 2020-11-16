@@ -1,0 +1,60 @@
+- name: failover-rejoin | follow confirmation
+  pause:
+    prompt: >-
+      Are you sure you wan to turn {{ inventory_hostname_short }}
+      into a follower for {{ postgres_repmgr_failover_new_master|mandatory }}
+      (type yes and confirm)
+    echo: true
+  register: confirm_follow
+
+- name: failover-rejoin | Handle confirmation
+  assert:
+    that: confirm_follow.user_input|strtobool
+    quiet: true
+    fail_msg: Cancelling follow
+
+- name: failover-rejoin |  stop repmgrd
+  systemd:
+    name: repmgrd
+    state: stopped
+  become_user: root
+  become: true
+
+- name: failover-rejoin | stop postgresql
+  systemd:
+    name: postgresql
+    state: stopped
+  become_user: root
+  become: true
+
+- name: failover-rejoin |  node rejoin
+  command: >-
+    repmgr standby clone --force
+    -h {{ postgres_repmgr_failover_new_master }}
+    -U {{ postgres_repmgr_user.name }}
+    -d {{ postgres_repmgr_user.db }}
+  changed_when: false
+
+- name: failover-rejoin | start postgresql
+  systemd:
+    name: postgresql
+    state: started
+  become_user: root
+  become: true
+
+- name: failover-rejoin | wait for postgres to listen on port 5432
+  wait_for:
+    port: 5432
+    delay: 2
+    timeout: 20
+
+- name: failover-rejoin | standby register
+  command: repmgr standby register --force
+  changed_when: false
+
+- name: failover-rejoin | start repmgr
+  systemd:
+    name: repmgrd
+    state: started
+  become_user: root
+  become: true

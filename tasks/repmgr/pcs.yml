@@ -1,0 +1,65 @@
+---
+- name: pcs | pcs cleanup
+  block:
+    - name: pcs | pcs remove repmgr_role attribute from nodes
+      command: "pcs node attribute {{ hostvars[item]['ansible_hostname'] }} repmgr_role="
+      register: pcs_out
+      changed_when: pcs_out.rc == 0
+      failed_when: "pcs_out.rc != 0 and pcs_out.stderr.find('t exist for node') == -1"
+      with_items: "{{ play_hosts }}"
+    - name: pcs | pcs resource cleanup
+      command: "{{ item }}"
+      register: pcs_out
+      changed_when: pcs_out.rc == 0
+      failed_when: "pcs_out.rc != 0 and pcs_out.stderr.find('could not find') != -1 and pcs_out.stderr.find('does not exist') != -1"
+      with_items:
+        - pcs resource unclone PostgresLBReadUnblock-clone
+        - pcs resource unclone PostgresLBReadBlock-clone
+        - pcs resource delete PostgresLBReadUnblock
+        - pcs resource delete PostgresLBReadBlock
+        - pcs resource unclone PostgresLBWriteUnblock-clone
+        - pcs resource unclone PostgresLBWriteBlock-clone
+        - pcs resource delete PostgresLBWriteUnblock
+        - pcs resource delete PostgresLBWriteBlock
+  when: postgres_repmgr_pcs_cleanup|bool
+
+- name: pcs | config resources from {{ ansible_hostname }}
+  block:
+  - name: pcs | create pcs resources
+    command: "{{ item }}"
+    register: pcs_out
+    changed_when: pcs_out.rc == 0
+    failed_when: "pcs_out.rc != 0 and pcs_out.stderr.find('already exists') == -1"
+    with_items:
+      - >-
+        pcs resource create PostgresLBWriteBlock ocf:heartbeat:command_raw
+        start_cmd="/usr/sbin/iptables -w --wait-interval 10 -A INPUT -m mark --mark 5434 -j REJECT"
+        stop_cmd="/usr/sbin/iptables -w --wait-interval 10 -D INPUT -m mark --mark 5434 -j REJECT"
+        monitor_cmd="/usr/sbin/iptables -w --wait-interval 10 -C INPUT -m mark --mark 5434 -j REJECT"
+      - >-
+        pcs resource create PostgresLBReadBlock ocf:heartbeat:command_raw
+        start_cmd="/usr/sbin/iptables -w --wait-interval 10 -A INPUT -m mark --mark 5435 -j REJECT"
+        stop_cmd="/usr/sbin/iptables -w --wait-interval 10 -D INPUT -m mark --mark 5435 -j REJECT"
+        monitor_cmd="/usr/sbin/iptables -w --wait-interval 10 -C INPUT -m mark --mark 5435 -j REJECT"
+
+  - name: pcs | pcs groups and constrains
+    command: "{{ item }}"
+    register: pcs_out
+    changed_when: pcs_out.rc == 0
+    failed_when: >-
+      pcs_out.rc != 0 and
+      pcs_out.stderr.find('already exists') == -1 and
+      pcs_out.stderr.find('is already a clone') == -1
+    with_items:
+      # clone port blockers/unblockers
+      - pcs resource  clone PostgresLBReadBlock clone-node-max=1 clone-min=1
+      - pcs resource  clone PostgresLBWriteBlock clone-node-max=1 clone-min=1
+
+      # fail will be always blocked
+      - pcs constraint location PostgresLBReadBlock-clone rule score=INFINITY repmgr_role eq fail
+      - pcs constraint location PostgresLBWriteBlock-clone rule score=INFINITY repmgr_role eq fail
+
+      # replica is blocked for write
+      - pcs constraint location PostgresLBWriteBlock-clone rule score=INFINITY repmgr_role eq replica
+
+  when: not postgres_repmgr_pcs_cleanup|bool

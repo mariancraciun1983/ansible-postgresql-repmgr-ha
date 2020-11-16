@@ -1,0 +1,70 @@
+---
+- name: ssh | ensure ssh directory
+  file:
+    path: ~/.ssh/
+    state: directory
+    mode: 0700
+
+- name: ssh | check if ssh key exists
+  stat:
+    path: ~/.ssh/id_rsa
+  register: id_rsa_status
+
+- name: ssh | master | config
+  block:
+    - name: ssh | master | gen ssh key
+      openssh_keypair:
+        path: ~/.ssh/id_rsa
+        force: true
+      when: not id_rsa_status.stat.exists
+
+    - name: ssh | master | read id_rsa
+      slurp:
+        src: ~/.ssh/id_rsa
+      register: master_id_rsa
+
+    - name: ssh | master | read id_rsa.pub
+      slurp:
+        src: ~/.ssh/id_rsa.pub
+      register: master_id_rsa_pub
+
+    - name: ssh | master | store ssh keys into dummy host
+      add_host:
+        name: _repmgr_dummy
+        id_rsa:  "{{ master_id_rsa['content'] | b64decode }}"
+        id_rsa_pub:  "{{ master_id_rsa_pub['content'] | b64decode }}"
+      no_log: true
+      changed_when: no
+  when: postgres_role == 'master'
+
+- name: ssh | scan sshkey
+  command: ssh-keyscan -trsa -p {{ ansible_ssh_port|default(22) }} {{ ansible_default_ipv4.address }}
+  changed_when: false
+  register: local_host_keys
+
+- name: ssh | exchange all known hosts
+  known_hosts:
+    name: "{% if postgres_use_internal_ip|bool %}{{ hostvars[item]['internal_ip'] }}{% else %}{{ hostvars[item]['ansible_default_ipv4']['address'] }}{% endif %}" # noqa 204
+    path: ~/.ssh/known_hosts
+    key: "{{ hostvars[item]['local_host_keys'].stdout }}"
+    state: present
+  with_items: "{{ play_hosts }}"
+
+- name: ssh | update authorized_keys
+  authorized_key:
+    user: postgres
+    key: "{{ hostvars['_repmgr_dummy']['id_rsa_pub'] }}"
+    state: present
+
+- name: ssh | deploy ssh keys to slaves
+  copy:
+    content: "{{ item.data }}"
+    dest: "{{ item.file }}"
+    mode: 0600
+  no_log: true
+  loop:
+    - file: ~/.ssh/id_rsa
+      data: "{{ hostvars['_repmgr_dummy']['id_rsa'] }}\n"
+    - file: ~/.ssh/id_rsa.pub
+      data: "{{  hostvars['_repmgr_dummy']['id_rsa_pub'] }}"
+  when: postgres_role == 'slave'

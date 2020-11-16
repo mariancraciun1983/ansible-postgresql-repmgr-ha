@@ -1,0 +1,27 @@
+local   all             postgres                                peer
+
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     peer
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            md5
+# IPv6 local connections:
+host    all             all             ::1/128                 md5
+
+### Replication
+#host    replication     {{postgres_repl_user.name}}             {{ postgres_listen_ip }}/24        trust
+host    replication     {{postgres_repl_user.name}}             {{ postgres_listen_ip }}/24        md5
+
+{% if postgres_repmgr_enabled|bool %}
+### Repmgr
+# allow repmgr connections
+#local   {{postgres_repmgr_user.db}}     {{postgres_repmgr_user.name}}                                     peer
+#host    {{postgres_repmgr_user.db}}     {{postgres_repmgr_user.name}}             127.0.0.1/32            md5
+host    replication     {{postgres_repmgr_user.name}}             {{ postgres_listen_ip }}/24        md5
+host    {{postgres_repmgr_user.db}}     {{postgres_repmgr_user.name}}             {{ postgres_listen_ip }}/24        md5
+{% endif %}
+
+host    all     all     {{ postgres_listen_ip }}/24    md5
+host    all     all     all    reject
+

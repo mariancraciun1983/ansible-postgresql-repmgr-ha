@@ -1,0 +1,50 @@
+---
+- name: postgres
+  block:
+
+  - name: packages
+    import_tasks: postgres/packages.yml
+    tags:
+      - packages
+
+  - name: config
+    import_tasks: postgres/config.yml
+    tags:
+      - config
+      - config-main
+
+  - name: config | master node
+    import_tasks: replication/master.yml
+    tags:
+      - config
+      - config-master
+    when: postgres_role == 'master'
+
+  - name: config | slave nodes
+    import_tasks: replication/slave.yml
+    tags:
+      - config
+      - config-slave
+    when: postgres_role == 'slave' and not postgres_repmgr_enabled|bool
+
+  - name: user
+    import_tasks: postgres/user.yml
+    become_user: postgres
+    become: true
+    when: postgres_role == 'master' and 'name' in postgres_admin_user
+    tags:
+      - user
+
+  - name: repmgr
+    import_tasks: repmgr/main.yml
+    when: postgres_repmgr_enabled|bool
+    tags:
+      - repmgr
+
+  - name: health
+    import_tasks: postgres/health.yml
+    when: postgres_role == 'master' and postgres_check_replication|bool
+    tags:
+      - health
+
+  when: postgres_role in ['master', 'slave']

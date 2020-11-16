@@ -1,0 +1,43 @@
+---
+- name: repmgr | packages
+  import_tasks: packages.yml
+  tags:
+    - repmgr-packages
+
+- name: repmgr | config
+  import_tasks: config.yml
+  tags:
+    - repmgr-config
+
+- name: repmgr | ssh
+  import_tasks: ssh.yml
+  become_user: postgres
+  become: true
+  tags:
+    - repmgr-ssh
+
+- name: repmgr | pacemaker
+  import_tasks: pacemaker/main.yml
+  tags:
+    - repmgr-pacemaker
+  when: postgres_repmgr_pacemaker|bool
+
+- name: repmgr | master
+  import_tasks: master.yml
+  when: postgres_role == 'master'
+  tags:
+    - repmgr-master
+
+- name: repmgr | slave
+  import_tasks: slave.yml
+  when: postgres_role == 'slave'
+  tags:
+    - repmgr-slave
+
+- name: repmgr | failed primary rejoin
+  import_tasks: master-rejoin.yml
+  become_user: postgres
+  become: true
+  when: postgres_repmgr_failover_host|default('?') == inventory_hostname_short
+  tags:
+    - repmgr-failover-rejoin

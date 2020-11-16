@@ -1,0 +1,54 @@
+- name: repmgr | check requirements
+  assert:
+    that:
+      - postgres_master_ip and postgres_master_ip|length
+      - postgres_master_node_id and postgres_master_node_id|length
+    quiet: true
+
+- name: repmgr | slave-cleanup
+  import_tasks: slave-cleanup.yml
+  when: postgres_slave_cleanup|bool
+
+- name: replica | check standby status
+  stat:
+    path: '{{ postgres_data_directory }}/standby.signal'
+  register: standby_status
+
+- name: replica | initialise
+  block:
+    - name: repmgr | set facts
+      set_fact:
+
+    - name: repmgr | stop postgresql
+      systemd:
+        name: postgresql
+        state: stopped
+
+    - name: repmgr | standby clone
+      command: >-
+        repmgr -F
+        -h {{ postgres_master_ip }}
+        -U {{ postgres_repmgr_user.name }}
+        -d {{ postgres_repmgr_user.db }}
+        standby clone
+      become_user: postgres
+      become: true
+
+    - name: repmgr | start PostgreSQL
+      systemd:
+        name: postgresql
+        state: started
+
+    - name: repmgr | wait for postgres to listen on port 5432
+      wait_for:
+        port: 5432
+        delay: 2
+        timeout: 20
+
+    - name: repmgr | register
+      command: >-
+        repmgr -F standby register
+        --upstream-node-id={{ postgres_master_node_id }}
+      become_user: postgres
+      become: true
+  when: not standby_status.stat.exists

@@ -1,0 +1,9 @@
+- name: replica | ensure postgresql is stopped
+  systemd:
+    name: postgresql
+    state: stopped
+
+- name: replica | remove data
+  file:
+    state: absent
+    path: "{{ postgres_data_directory }}"
