@@ -1,0 +1,23 @@
+---
+galaxy_info:
+  role_name: postgres_repmgr_ha
+  author: Marian Craciun
+  description: >-
+    Ansible role to configure PostgreSQL, Repmgr for High Availability
+    and automated load balancing with HAProxy, Corosync and Pacemaker
+  license: MIT
+
+  min_ansible_version: 2.7
+  galaxy_tags:
+    - postgresql
+    - repmgr
+    - ha
+    - cluster
+    - corosync
+    - pacemaker
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - bionic
+dependencies: []
